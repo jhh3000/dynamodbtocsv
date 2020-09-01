@@ -11,18 +11,7 @@ program
   .version("0.0.1")
   .option("-t, --table [tablename]", "Add the table you want to output to csv")
   .option("-d, --describe")
-  .option("-r, --region [regionname]")
-  .option(
-    "-e, --endpoint [url]",
-    "Endpoint URL, can be used to dump from local DynamoDB"
-  )
-  .option("-p, --profile [profile]", "Use profile from your credentials file")
-  .option("-m, --mfa [mfacode]", "Add an MFA code to access profiles that require mfa.")
   .option("-f, --file [file]", "Name of the file to be created")
-  .option(
-    "-ec --envcreds",
-    "Load AWS Credentials using AWS Credential Provider Chain"
-  )
   .option("-s, --size [size]", "Number of lines to read before writing.", 5000)
   .parse(process.argv);
 
@@ -32,48 +21,15 @@ if (!program.table) {
   process.exit(1);
 }
 
-if (program.region && AWS.config.credentials) {
-  AWS.config.update({ region: program.region });
-} else {
-  AWS.config.loadFromPath(__dirname + "/config.json");
+const config = {
+  region: "us-west-2"
+};
+
+if (process.env.AWS_DYNAMO_ENDPOINT) {
+  config.endpoint = process.env.AWS_DYNAMO_ENDPOINT;
 }
 
-if (program.endpoint) {
-  AWS.config.update({ endpoint: program.endpoint });
-}
-
-if (program.profile) {
-  var newCreds = new AWS.SharedIniFileCredentials({ profile: program.profile });
-  newCreds.profile = program.profile;
-  AWS.config.update({ credentials: newCreds });
-}
-
-if (program.envcreds) {
-  var newCreds = AWS.config.credentials;
-  newCreds.profile = program.profile;
-  AWS.config.update({
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-    },
-    region: process.env.AWS_DEFAULT_REGION
-  });
-}
-
-if (program.mfa && program.profile) {
-  const creds = new AWS.SharedIniFileCredentials({
-    tokenCodeFn: (serial, cb) => {cb(null, program.mfa)},
-    profile: program.profile
-  });
-
-  // Update config to include MFA
-  AWS.config.update({ credentials: creds });
-} else if(program.mfa && !program.profile) {
-  console.log('error: MFA requires a profile(-p [profile]) to work');
-  process.exit(1);
-}
-
-var dynamoDB = new AWS.DynamoDB();
+var dynamoDB = new AWS.DynamoDB(config);
 
 var query = {
   TableName: program.table,
